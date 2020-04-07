@@ -10,16 +10,7 @@ matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = 'Arial'
 import os
 import operator
-
-import utils
-
-from utils.constants import UNIVARIATE_DATASET_NAMES as DATASET_NAMES
-from utils.constants import UNIVARIATE_DATASET_NAMES_2018 as DATASET_NAMES_2018
-from utils.constants import ARCHIVE_NAMES  as ARCHIVE_NAMES
-from utils.constants import CLASSIFIERS
-from utils.constants import ITERATIONS
-from utils.constants import MTS_DATASET_NAMES
-
+from utils.constants import *
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
@@ -28,6 +19,7 @@ from sklearn.preprocessing import LabelEncoder
 from scipy.interpolate import interp1d
 from scipy.io import loadmat
 
+from sktime.utils.load_data import load_from_tsfile_to_dataframe
 
 def readucr(filename):
     data = np.loadtxt(filename, delimiter=',')
@@ -128,7 +120,7 @@ def read_all_datasets(root_dir, archive_name, split_val=False):
             datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
                                            y_test.copy())
     elif archive_name == 'UCRArchive_2018':
-        for dataset_name in DATASET_NAMES_2018:
+        for dataset_name in UNIVARIATE_DATASET_NAMES_2018:
             root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
 
             df_train = pd.read_csv(root_dir_dataset + '/' + dataset_name + '_TRAIN.tsv', sep='\t', header=None)
@@ -148,19 +140,19 @@ def read_all_datasets(root_dir, archive_name, split_val=False):
             x_test = x_test.values
 
             # znorm
-            std_ = x_train.std(axis=1, keepdims=True)
-            std_[std_ == 0] = 1.0
-            x_train = (x_train - x_train.mean(axis=1, keepdims=True)) / std_
+            #std_ = x_train.std(axis=1, keepdims=True)
+            #std_[std_ == 0] = 1.0
+            #x_train = (x_train - x_train.mean(axis=1, keepdims=True)) / std_
 
-            std_ = x_test.std(axis=1, keepdims=True)
-            std_[std_ == 0] = 1.0
-            x_test = (x_test - x_test.mean(axis=1, keepdims=True)) / std_
+            #std_ = x_test.std(axis=1, keepdims=True)
+            #std_[std_ == 0] = 1.0
+            #x_test = (x_test - x_test.mean(axis=1, keepdims=True)) / std_
 
             datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
                                            y_test.copy())
 
     else:
-        for dataset_name in DATASET_NAMES:
+        for dataset_name in UNIVARIATE_DATASET_NAMES:
             root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
             file_name = root_dir_dataset + dataset_name
             x_train, y_train = readucr(file_name + '_TRAIN')
@@ -173,8 +165,8 @@ def read_all_datasets(root_dir, archive_name, split_val=False):
 
         dataset_names_to_sort.sort(key=operator.itemgetter(1))
 
-        for i in range(len(DATASET_NAMES)):
-            DATASET_NAMES[i] = dataset_names_to_sort[i][0]
+        for i in range(len(UNIVARIATE_DATASET_NAMES)):
+            UNIVARIATE_DATASET_NAMES[i] = dataset_names_to_sort[i][0]
 
     return datasets_dict
 
@@ -185,19 +177,21 @@ def get_func_length(x_train, x_test, func):
     else:
         func_length = 0
 
-    n = x_train.shape[0]
+    #n = x_train.shape[0]
+    n = len(x_train)
     for i in range(n):
         func_length = func(func_length, x_train[i].shape[1])
 
-    n = x_test.shape[0]
+    #n = x_test.shape[0]
+    n = len(x_test)
     for i in range(n):
         func_length = func(func_length, x_test[i].shape[1])
 
     return func_length
 
 
-def transform_to_same_length(x, n_var, max_length):
-    n = x.shape[0]
+def transform_to_same_length(x, n_var, max_length, transformation='pad'):
+    n = len(x)
 
     # the new set in ucr form np array
     ucr_x = np.zeros((n, max_length, n_var), dtype=np.float64)
@@ -211,26 +205,28 @@ def transform_to_same_length(x, n_var, max_length):
         for j in range(n_var):
             ts = mts[j]
             # linear interpolation
-            f = interp1d(idx, ts, kind='cubic')
-            new_ts = f(idx_new)
-            ucr_x[i, :, j] = new_ts
-
+            if transformation == 'interp':
+                f = interp1d(idx, ts, kind='cubic')
+                new_ts = f(idx_new)
+                ucr_x[i, :, j] = new_ts
+            else:
+                new_ts = ts
+                ucr_x[i, :new_ts.shape[0], j] = new_ts
     return ucr_x
 
 
-def transform_mts_to_ucr_format():
-    mts_root_dir = '/mnt/Other/mtsdata/'
-    mts_out_dir = '/mnt/nfs/casimir/archives/mts_archive/'
+def transform_mts_to_npy_format(source_root_directory, output_root_directory):
     for dataset_name in MTS_DATASET_NAMES:
         # print('dataset_name',dataset_name)
 
-        out_dir = mts_out_dir + dataset_name + '/'
+        out_dir = output_root_directory + dataset_name + '/'
 
-        # if create_directory(out_dir) is None:
-        #     print('Already_done')
-        #     continue
+        if create_directory(out_dir) is None:
+            print('MAT to NPY transformation was already done for dataset {}'.format(dataset_name))
+            continue
 
-        a = loadmat(mts_root_dir + dataset_name + '/' + dataset_name + '.mat')
+        a = loadmat(source_root_directory + dataset_name + '/' + dataset_name + '.mat')
+
         a = a['mts']
         a = a[0, 0]
 
@@ -247,11 +243,6 @@ def transform_mts_to_ucr_format():
             elif dt[i] == 'testlabels':
                 y_test = a[i].reshape(max(a[i].shape))
 
-        # x_train = a[1][0]
-        # y_train = a[0][:,0]
-        # x_test = a[3][0]
-        # y_test = a[2][:,0]
-
         n_var = x_train[0].shape[0]
 
         max_length = get_func_length(x_train, x_test, func=max)
@@ -259,7 +250,7 @@ def transform_mts_to_ucr_format():
 
         print(dataset_name, 'max', max_length, 'min', min_length)
         print()
-        # continue
+        #continue
 
         x_train = transform_to_same_length(x_train, n_var, max_length)
         x_test = transform_to_same_length(x_test, n_var, max_length)
@@ -270,7 +261,82 @@ def transform_mts_to_ucr_format():
         np.save(out_dir + 'x_test.npy', x_test)
         np.save(out_dir + 'y_test.npy', y_test)
 
-        print('Done')
+        print('Successfully transfomed dataset {} from MAT to NPY.'.format(dataset_name))
+
+
+def transform_ts_to_npy_format(source_root_directory, archive_name, output_root_directory):
+    for dataset_name in dataset_names_for_archive[archive_name]:
+        root_dir_dataset = source_root_directory + '/archives/' + archive_name + '_ts/' + dataset_name + '/'
+        out_dir = output_root_directory + '/archives/' + archive_name + '_npy/' + dataset_name + '/'
+
+        if create_directory(out_dir) is None:
+            print('MAT to NPY transformation was already done for dataset {}'.format(dataset_name))
+            continue
+
+        df_train_x, y_train = load_from_tsfile_to_dataframe(os.path.join(root_dir_dataset, dataset_name + '_TRAIN.ts'))
+        df_test_x, y_test = load_from_tsfile_to_dataframe(os.path.join(root_dir_dataset, dataset_name + '_TEST.ts'))
+
+        def to_numpy(df):
+            columns = list(df)
+            numpy_list = []
+            print('Processing dataset of size {}'.format(len(df)))
+            for i, row in df.iterrows():
+                if i % 100 == 0:
+                    print("Done {} / {}".format(i, len(df)))
+                channel_arrays = []
+                ns = []
+                for c in columns:
+                    channel_arrays.append(row[c].to_numpy())
+                    ns.append(len(row[c]))
+                # Pad to same length
+                if len(channel_arrays) > 1:
+                    N = max(ns)
+                    channel_arrays_sl = []
+                    for ch in channel_arrays:
+                        channel_arrays_sl.append(np.pad(ch, [(0, N - len(ch))], mode='constant'))
+                    channel_arrays = channel_arrays_sl
+                numpy_list.append(np.stack(channel_arrays, axis=0))
+            return numpy_list
+
+        x_train = to_numpy(df_train_x)
+        x_test = to_numpy(df_test_x)
+
+        #print(type(x_train.shape))
+        #print(x_test.shape)
+        #print("############")
+        #print(y_train)
+        #print(y_test)
+
+        # znorm
+        # std_ = x_train.std(axis=1, keepdims=True)
+        # std_[std_ == 0] = 1.0
+        # x_train = (x_train - x_train.mean(axis=1, keepdims=True)) / std_
+
+        # std_ = x_test.std(axis=1, keepdims=True)
+        # std_[std_ == 0] = 1.0
+        # x_test = (x_test - x_test.mean(axis=1, keepdims=True)) / std_
+
+        n_var = x_train[0].shape[0]
+
+        max_length = get_func_length(x_train, x_test, func=max)
+        min_length = get_func_length(x_train, x_test, func=min)
+
+        print(dataset_name, 'max', max_length, 'min', min_length)
+        print()
+
+        x_train = transform_to_same_length(x_train, n_var, max_length)
+        x_test = transform_to_same_length(x_test, n_var, max_length)
+
+        print("Train data shape: ", x_train.shape)
+        print("Test data shape: ", x_test.shape)
+
+        # save them
+        np.save(out_dir + 'x_train.npy', x_train)
+        np.save(out_dir + 'y_train.npy', y_train)
+        np.save(out_dir + 'x_test.npy', x_test)
+        np.save(out_dir + 'y_test.npy', y_test)
+
+        print('Successfully transformed dataset {} from TS to NPY.'.format(dataset_name))
 
 
 def calculate_metrics(y_true, y_pred, duration, y_true_val=None, y_pred_val=None):
@@ -452,7 +518,7 @@ def viz_perf_themes(root_dir, df):
     themes_index = []
     # add the themes
     for dataset_name in df.index:
-        themes_index.append(utils.constants.dataset_types[dataset_name])
+        themes_index.append(dataset_types[dataset_name])
 
     themes_index = np.array(themes_index)
     themes, themes_counts = np.unique(themes_index, return_counts=True)

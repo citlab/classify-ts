@@ -48,14 +48,28 @@ UNIVARIATE_DATASET_NAMES_2018 = ['ACSF1', 'Adiac', 'AllGestureWiimoteX', 'AllGes
                                  'UWaveGestureLibraryX', 'UWaveGestureLibraryY', 'UWaveGestureLibraryZ',
                                  'Wafer', 'Wine', 'WordSynonyms', 'Worms', 'WormsTwoClass', 'Yoga']
 
+MULTIVARIATE_DATASET_NAMES_2018 = ['ArticularyWordRecognition', 'CharacterTrajectories', 'EigenWorms',
+                                   'EthanolConcentration', 'HandMovementDirection', 'InsectWingbeat', 'LSST',
+                                   'PEMS-SF', 'RacketSports', 'SpokenArabicDigits', 'AtrialFibrillation', 'Cricket',
+                                   'Epilepsy', 'FaceDetection', 'Handwriting', 'JapaneseVowels', 'MotorImagery',
+                                   'PenDigits', 'SelfRegulationSCP1', 'StandWalkJump', 'BasicMotions', 'DuckDuckGeese',
+                                   'ERing', 'FingerMovements', 'Heartbeat', 'Libras', 'NATOPS', 'PhonemeSpectra',
+                                   'SelfRegulationSCP2', 'UWaveGestureLibrary']
+
 MTS_DATASET_NAMES = ['ArabicDigits', 'AUSLAN', 'CharacterTrajectories', 'CMUsubject16', 'ECG',
-                     'JapaneseVowels', 'KickvsPunch', 'Libras', 'NetFlow', 'UWave', 'Wafer', 'WalkvsRun']
+                     'JapaneseVowels', 'KickvsPunch', 'Libras', 'NetFlow', 'PEMS', 'UWave', 'Wafer', 'WalkvsRun']
 
 ITERATIONS = 5  # nb of random runs for random initializations
 
-ARCHIVE_NAMES = ['UCRArchive_2018']
+MTS_ARCHIVE = 'mts_npy'
+UCR_UV_ARCHIVE = 'UCRArchive_2018_univariate'
+UCR_MV_ARCHIVE = 'UCRArchive_2018_multivariate'
 
-dataset_names_for_archive = {'UCRArchive_2018': UNIVARIATE_DATASET_NAMES_2018}
+ARCHIVE_NAMES = [UCR_UV_ARCHIVE, UCR_MV_ARCHIVE, MTS_ARCHIVE]
+
+dataset_names_for_archive = {UCR_UV_ARCHIVE: UNIVARIATE_DATASET_NAMES_2018,
+                             UCR_MV_ARCHIVE: MULTIVARIATE_DATASET_NAMES_2018,
+                             MTS_ARCHIVE: MTS_DATASET_NAMES}
 
 CLASSIFIERS = ['fcn', 'mlp', 'resnet', 'tlenet', 'mcnn', 'twiesn', 'encoder', 'mcdcnn', 'cnn', 'inception']
 

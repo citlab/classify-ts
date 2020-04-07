@@ -1,7 +1,7 @@
-from utils.utils import generate_results_csv
+from utils.utils import generate_results_csv, transform_ts_to_npy_format
 from utils.utils import create_directory
 from utils.utils import read_dataset
-from utils.utils import transform_mts_to_ucr_format
+from utils.utils import transform_mts_to_npy_format
 from utils.utils import visualize_filter
 from utils.utils import viz_for_survey_paper
 from utils.utils import viz_cam
@@ -10,9 +10,7 @@ import numpy as np
 import sys
 import sklearn
 import utils
-from utils.constants import CLASSIFIERS
-from utils.constants import ARCHIVE_NAMES
-from utils.constants import ITERATIONS
+from utils.constants import *
 from utils.utils import read_all_datasets
 
 
@@ -80,7 +78,7 @@ def create_classifier(classifier_name, input_shape, nb_classes, output_directory
 ############################################### main
 
 # change this directory for your machine
-root_dir = '/b/home/uha/hfawaz-datas/dl-tsc-temp/'
+root_dir = '/home/alex/data/time_series/'
 
 if sys.argv[1] == 'run_all':
     for classifier_name in CLASSIFIERS:
@@ -115,7 +113,12 @@ if sys.argv[1] == 'run_all':
                     create_directory(output_directory + '/DONE')
 
 elif sys.argv[1] == 'transform_mts_to_ucr_format':
-    transform_mts_to_ucr_format()
+    source_root_directory = root_dir + '/archives/mts_mat/'
+    output_root_directory = root_dir + '/archives/' + MTS_ARCHIVE + '/'
+    transform_mts_to_npy_format(source_root_directory, output_root_directory)
+elif sys.argv[1] == 'transform_ts_to_ucr_format':
+    transform_ts_to_npy_format(root_dir, UCR_UV_ARCHIVE, root_dir)
+    transform_ts_to_npy_format(root_dir, UCR_MV_ARCHIVE, root_dir)
 elif sys.argv[1] == 'visualize_filter':
     visualize_filter(root_dir)
 elif sys.argv[1] == 'viz_for_survey_paper':
