@@ -59,17 +59,21 @@ MULTIVARIATE_DATASET_NAMES_2018 = ['ArticularyWordRecognition', 'CharacterTrajec
 MTS_DATASET_NAMES = ['ArabicDigits', 'AUSLAN', 'CharacterTrajectories', 'CMUsubject16', 'ECG',
                      'JapaneseVowels', 'KickvsPunch', 'Libras', 'NetFlow', 'PEMS', 'UWave', 'Wafer', 'WalkvsRun']
 
+MY_MVTS_DATASET_NAMES = ['IMS_VOD']
+
 ITERATIONS = 5  # nb of random runs for random initializations
 
+MY_MVTS_ARCHIVE = 'my_mvts'
 MTS_ARCHIVE = 'mts_npy'
 UCR_UV_ARCHIVE = 'UCRArchive_2018_univariate'
 UCR_MV_ARCHIVE = 'UCRArchive_2018_multivariate'
 
-ARCHIVE_NAMES = [UCR_UV_ARCHIVE, UCR_MV_ARCHIVE, MTS_ARCHIVE]
+ARCHIVE_NAMES = [UCR_UV_ARCHIVE, UCR_MV_ARCHIVE, MTS_ARCHIVE, MY_MVTS_ARCHIVE]
 
 dataset_names_for_archive = {UCR_UV_ARCHIVE: UNIVARIATE_DATASET_NAMES_2018,
                              UCR_MV_ARCHIVE: MULTIVARIATE_DATASET_NAMES_2018,
-                             MTS_ARCHIVE: MTS_DATASET_NAMES}
+                             MTS_ARCHIVE: MTS_DATASET_NAMES,
+                             MY_MVTS_ARCHIVE: MY_MVTS_DATASET_NAMES}
 
 CLASSIFIERS = ['fcn', 'mlp', 'resnet', 'tlenet', 'mcnn', 'twiesn', 'encoder', 'mcdcnn', 'cnn', 'inception']
 

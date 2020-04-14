@@ -1,13 +1,8 @@
-from builtins import print
+#from builtins import print
 import numpy as np
 import pandas as pd
 import matplotlib
-
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
-
-matplotlib.rcParams['font.family'] = 'sans-serif'
-matplotlib.rcParams['font.sans-serif'] = 'Arial'
 import os
 import operator
 from utils.constants import *
@@ -20,6 +15,10 @@ from scipy.interpolate import interp1d
 from scipy.io import loadmat
 
 from sktime.utils.load_data import load_from_tsfile_to_dataframe
+
+matplotlib.use('agg')
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = 'Arial'
 
 def readucr(filename):
     data = np.loadtxt(filename, delimiter=',')
@@ -215,6 +214,7 @@ def transform_to_same_length(x, n_var, max_length, transformation='pad'):
     return ucr_x
 
 
+# (SIZE, LEN, CHANNELS)
 def transform_mts_to_npy_format(source_root_directory, output_root_directory):
     for dataset_name in MTS_DATASET_NAMES:
         # print('dataset_name',dataset_name)
@@ -252,8 +252,11 @@ def transform_mts_to_npy_format(source_root_directory, output_root_directory):
         print()
         #continue
 
+        #print(x_train[0].shape)
         x_train = transform_to_same_length(x_train, n_var, max_length)
         x_test = transform_to_same_length(x_test, n_var, max_length)
+        #print(x_train.shape)
+        #continue
 
         # save them
         np.save(out_dir + 'x_train.npy', x_train)
@@ -264,6 +267,7 @@ def transform_mts_to_npy_format(source_root_directory, output_root_directory):
         print('Successfully transfomed dataset {} from MAT to NPY.'.format(dataset_name))
 
 
+# (SIZE, LEN, CHANNELS)
 def transform_ts_to_npy_format(source_root_directory, archive_name, output_root_directory):
     for dataset_name in dataset_names_for_archive[archive_name]:
         root_dir_dataset = source_root_directory + '/archives/' + archive_name + '_ts/' + dataset_name + '/'
@@ -324,11 +328,13 @@ def transform_ts_to_npy_format(source_root_directory, archive_name, output_root_
         print(dataset_name, 'max', max_length, 'min', min_length)
         print()
 
+        print("Train data shape: ", x_train[0].shape)
+        print("Test data shape: ", x_test[0].shape)
         x_train = transform_to_same_length(x_train, n_var, max_length)
         x_test = transform_to_same_length(x_test, n_var, max_length)
-
         print("Train data shape: ", x_train.shape)
         print("Test data shape: ", x_test.shape)
+        #continue
 
         # save them
         np.save(out_dir + 'x_train.npy', x_train)
