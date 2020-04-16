@@ -1,24 +1,17 @@
-from utils.utils import generate_results_csv, transform_ts_to_npy_format
-from utils.utils import create_directory
-from utils.utils import read_dataset
-from utils.utils import transform_mts_to_npy_format
-from utils.utils import visualize_filter
-from utils.utils import viz_for_survey_paper
-from utils.utils import viz_cam
-import os
-import numpy as np
+import argparse
+import logging
+
 import sys
 import sklearn
-import utils
+from utils.utils import *
 from utils.constants import *
-from utils.utils import read_all_datasets
 
 
-def fit_classifier():
-    x_train = datasets_dict[dataset_name][0]
-    y_train = datasets_dict[dataset_name][1]
-    x_test = datasets_dict[dataset_name][2]
-    y_test = datasets_dict[dataset_name][3]
+def fit_classifier(dataset, classifier_name, output_directory):
+    x_train = dataset[0]
+    y_train = dataset[1]
+    x_test = dataset[2]
+    y_test = dataset[3]
 
     nb_classes = len(np.unique(np.concatenate((y_train, y_test), axis=0)))
 
@@ -28,7 +21,7 @@ def fit_classifier():
     y_train = enc.transform(y_train.reshape(-1, 1)).toarray()
     y_test = enc.transform(y_test.reshape(-1, 1)).toarray()
 
-    # save orignal y because later we will use binary
+    # save original y because later we will use binary
     y_true = np.argmax(y_test, axis=1)
 
     if len(x_train.shape) == 2:  # if univariate
@@ -38,7 +31,6 @@ def fit_classifier():
 
     input_shape = x_train.shape[1:]
     classifier = create_classifier(classifier_name, input_shape, nb_classes, output_directory)
-
     classifier.fit(x_train, y_train, x_test, y_test, y_true)
 
 
@@ -75,86 +67,93 @@ def create_classifier(classifier_name, input_shape, nb_classes, output_directory
         return inception.Classifier_INCEPTION(output_directory, input_shape, nb_classes, verbose)
 
 
-############################################### main
+def run(root_dir, classifiers, archive2dataset, iteration):
+    for classifier_name in classifiers:
+        for archive_name in archive2dataset:
+            logging.info('Evaluating classifier {} on datasets {} from archive {}. Iteration #{}'
+                         .format(classifier_name, ", ".join(archive2dataset[archive_name]), archive_name, iteration))
 
-# change this directory for your machine
-root_dir = '/home/alex/data/time_series/'
+            datasets_dict = read_datasets(root_dir, archive_name, archive2dataset[archive_name])
+            i = '_itr_{}'.format(iteration)
 
-if sys.argv[1] == 'run_all':
-    for classifier_name in CLASSIFIERS:
-        print('classifier_name', classifier_name)
+            tmp_output_directory = os.path.join(root_dir,'results', classifier_name, archive_name + i)
+            for dataset_name in datasets_dict:
+                print('\t\t\tdataset_name: ', dataset_name)
+                output_directory = os.path.join(tmp_output_directory, dataset_name)
+                create_directory(output_directory)
 
-        for archive_name in ARCHIVE_NAMES:
-            print('\tarchive_name', archive_name)
+                fit_classifier(datasets_dict[dataset_name], classifier_name, output_directory)
 
-            datasets_dict = read_all_datasets(root_dir, archive_name)
+                print('\t\t\t\tDONE')
 
-            for iter in range(ITERATIONS):
-                print('\t\titer', iter)
+                # the creation of this directory means
+                create_directory(output_directory + '/DONE')
 
-                trr = ''
-                if iter != 0:
-                    trr = '_itr_' + str(iter)
 
-                tmp_output_directory = root_dir + '/results/' + classifier_name + '/' + archive_name + trr + '/'
+# ############################################## main
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-op", "--operation", type=str, required=True,
+                        help="Defines the operation that should be executed. Can be one of those:\n"
+                             "\trun_all: Run all models on all datasets.\n"
+                             "\trun_on_dataset: Run all models on a specific dataset.\n"
+                             "\trun_model: Run one specific model on all datasets."
+                             "\ttransform_mts_to_npy_format: Transform whole MTS dataset to numpy files.\n"
+                             "\ttransform_ucr_to_npy_format: Transform whole UCR dataset to numpy files.\n"
+                             "\tvisualize_filter: ...\n"
+                             "\tviz_for_survey_paper: ...\n"
+                             "\tviz_cam: ...\n"
+                             "\tgenerate_results_csv: ...\n")
+    parser.add_argument("-r", "--root-dir", type=str, required=True, help="Root data directory.")
+    parser.add_argument("-a", "--archive", type=str, help="Archive name.")
+    parser.add_argument("-d", "--dataset", type=str, help="Dataset name.")
+    parser.add_argument("-m", "--model", type=str, help="Model name.")
+    parser.add_argument("-i", "--iteration", type=int, help="Iteration number.")
+    args = parser.parse_args()
 
-                for dataset_name in utils.constants.dataset_names_for_archive[archive_name]:
-                    print('\t\t\tdataset_name: ', dataset_name)
+    op = args.operation
+    root_dir = args.root_dir
+    iteration = args.iteration if args.iteration else 0
 
-                    output_directory = tmp_output_directory + dataset_name + '/'
-
-                    create_directory(output_directory)
-
-                    fit_classifier()
-
-                    print('\t\t\t\tDONE')
-
-                    # the creation of this directory means
-                    create_directory(output_directory + '/DONE')
-
-elif sys.argv[1] == 'transform_mts_to_ucr_format':
-    source_root_directory = root_dir + '/archives/mts_mat/'
-    output_root_directory = root_dir + '/archives/' + MTS_ARCHIVE + '/'
-    transform_mts_to_npy_format(source_root_directory, output_root_directory)
-elif sys.argv[1] == 'transform_ts_to_ucr_format':
-    transform_ts_to_npy_format(root_dir, UCR_UV_ARCHIVE, root_dir)
-    transform_ts_to_npy_format(root_dir, UCR_MV_ARCHIVE, root_dir)
-elif sys.argv[1] == 'visualize_filter':
-    visualize_filter(root_dir)
-elif sys.argv[1] == 'viz_for_survey_paper':
-    viz_for_survey_paper(root_dir)
-elif sys.argv[1] == 'viz_cam':
-    viz_cam(root_dir)
-elif sys.argv[1] == 'generate_results_csv':
-    res = generate_results_csv('results.csv', root_dir)
-    print(res.to_string())
-else:
-    # this is the code used to launch an experiment on a dataset
-    archive_name = sys.argv[1]
-    dataset_name = sys.argv[2]
-    classifier_name = sys.argv[3]
-    itr = sys.argv[4]
-
-    if itr == '_itr_0':
-        itr = ''
-
-    output_directory = root_dir + '/results/' + classifier_name + '/' + archive_name + itr + '/' + \
-                       dataset_name + '/'
-
-    test_dir_df_metrics = output_directory + 'df_metrics.csv'
-
-    print('Method: ', archive_name, dataset_name, classifier_name, itr)
-
-    if os.path.exists(test_dir_df_metrics):
-        print('Already done')
+    if op == 'run_all':
+        for classifier_name in CLASSIFIERS:
+            run(root_dir, classifier_name, dataset_names_for_archive, iteration)
+    elif op == "run_on_dataset":
+        if args.archive and args.dataset:
+            archive = args.archive
+            dataset = args.dataset
+            for classifier_name in CLASSIFIERS:
+                run(root_dir, classifier_name, {archive: [dataset]}, iteration)
+        else:
+            logging.error("For operation mode {} parameters archive and dataset must be defined.".format(op))
+    elif op == "run_model":
+        if args.model:
+            model = args.model
+            run(root_dir, model, dataset_names_for_archive, iteration)
+        else:
+            logging.error("For operation mode {} parameter model must be defined.".format(op))
+    elif op == 'transform_mts_to_npy_format':
+        source_root_directory = root_dir + '/archives/mts_mat/'
+        output_root_directory = root_dir + '/archives/' + MTS_ARCHIVE + '/'
+        transform_mts_to_npy_format(source_root_directory, output_root_directory)
+    elif op == 'transform_ucr_to_npy_format':
+        transform_ts_to_npy_format(root_dir, UCR_UV_ARCHIVE, root_dir)
+        transform_ts_to_npy_format(root_dir, UCR_MV_ARCHIVE, root_dir)
+    elif op == 'visualize_filter':
+        visualize_filter(root_dir)
+    elif op == 'viz_for_survey_paper':
+        viz_for_survey_paper(root_dir)
+    elif op == 'viz_cam':
+        viz_cam(root_dir)
+    elif op == 'generate_results_csv':
+        res = generate_results_csv('results.csv', root_dir)
+        print(res.to_string())
     else:
+        logging.error("Invalid operation parameter {}".format(op))
 
-        create_directory(output_directory)
-        datasets_dict = read_dataset(root_dir, archive_name, dataset_name)
 
-        fit_classifier()
+if __name__ == '__main__':
+    main()
 
-        print('DONE')
 
-        # the creation of this directory means
-        create_directory(output_directory + '/DONE')
+

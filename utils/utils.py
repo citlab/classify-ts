@@ -1,24 +1,24 @@
-#from builtins import print
-import numpy as np
-import pandas as pd
+# from builtins import print
+import os
+
 import matplotlib
 import matplotlib.pyplot as plt
-import os
-import operator
-from utils.constants import *
+import numpy as np
+import pandas as pd
+from scipy.interpolate import interp1d
+from scipy.io import loadmat
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.preprocessing import LabelEncoder
-
-from scipy.interpolate import interp1d
-from scipy.io import loadmat
-
 from sktime.utils.load_data import load_from_tsfile_to_dataframe
+
+from utils.constants import *
 
 matplotlib.use('agg')
 matplotlib.rcParams['font.family'] = 'sans-serif'
 matplotlib.rcParams['font.sans-serif'] = 'Arial'
+
 
 def readucr(filename):
     data = np.loadtxt(filename, delimiter=',')
@@ -48,126 +48,40 @@ def create_path(root_dir, classifier_name, archive_name):
         return output_directory
 
 
+def read_all_datasets(root_dir, archive_name):
+    datasets_dict = {}
+    for dataset_name in dataset_names_for_archive[archive_name]:
+        datasets_dict.update(__read_npy_data(root_dir, archive_name, dataset_name))
+
+    return datasets_dict
+
+
+def read_datasets(root_dir, archive_name, dataset_names):
+    datasets_dict = {}
+    for dataset_name in dataset_names:
+        datasets_dict.update(__read_npy_data(root_dir, archive_name, dataset_name))
+
+    return datasets_dict
+
+
 def read_dataset(root_dir, archive_name, dataset_name):
     datasets_dict = {}
-    cur_root_dir = root_dir.replace('-temp', '')
-
-    if archive_name == 'mts_archive':
-        file_name = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
-        x_train = np.load(file_name + 'x_train.npy')
-        y_train = np.load(file_name + 'y_train.npy')
-        x_test = np.load(file_name + 'x_test.npy')
-        y_test = np.load(file_name + 'y_test.npy')
-
-        datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                       y_test.copy())
-
-    elif archive_name == 'UCRArchive_2018':
-        root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
-        df_train = pd.read_csv(root_dir_dataset + '/' + dataset_name + '_TRAIN.tsv', sep='\t', header=None)
-
-        df_test = pd.read_csv(root_dir_dataset + '/' + dataset_name + '_TEST.tsv', sep='\t', header=None)
-
-        y_train = df_train.values[:, 0]
-        y_test = df_test.values[:, 0]
-
-        x_train = df_train.drop(columns=[0])
-        x_test = df_test.drop(columns=[0])
-
-        x_train.columns = range(x_train.shape[1])
-        x_test.columns = range(x_test.shape[1])
-
-        x_train = x_train.values
-        x_test = x_test.values
-
-        # znorm
-        std_ = x_train.std(axis=1, keepdims=True)
-        std_[std_ == 0] = 1.0
-        x_train = (x_train - x_train.mean(axis=1, keepdims=True)) / std_
-
-        std_ = x_test.std(axis=1, keepdims=True)
-        std_[std_ == 0] = 1.0
-        x_test = (x_test - x_test.mean(axis=1, keepdims=True)) / std_
-
-        datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                       y_test.copy())
-    else:
-        file_name = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/' + dataset_name
-        x_train, y_train = readucr(file_name + '_TRAIN')
-        x_test, y_test = readucr(file_name + '_TEST')
-        datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                       y_test.copy())
-
+    datasets_dict.update(__read_npy_data(root_dir, archive_name, dataset_name))
     return datasets_dict
 
 
-def read_all_datasets(root_dir, archive_name, split_val=False):
-    datasets_dict = {}
+def __read_npy_data(root_dir, archive_name, dataset_name):
     cur_root_dir = root_dir.replace('-temp', '')
-    dataset_names_to_sort = []
+    root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
 
-    if archive_name == 'mts_archive':
+    x_train = np.load(root_dir_dataset + 'x_train.npy', allow_pickle=True)
+    y_train = np.load(root_dir_dataset + 'y_train.npy', allow_pickle=True)
+    x_test = np.load(root_dir_dataset + 'x_test.npy', allow_pickle=True)
+    y_test = np.load(root_dir_dataset + 'y_test.npy', allow_pickle=True)
 
-        for dataset_name in MTS_DATASET_NAMES:
-            root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
+    dataset = (x_train.copy(), y_train.copy(), x_test.copy(), y_test.copy())
 
-            x_train = np.load(root_dir_dataset + 'x_train.npy')
-            y_train = np.load(root_dir_dataset + 'y_train.npy')
-            x_test = np.load(root_dir_dataset + 'x_test.npy')
-            y_test = np.load(root_dir_dataset + 'y_test.npy')
-
-            datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                           y_test.copy())
-    elif archive_name == 'UCRArchive_2018':
-        for dataset_name in UNIVARIATE_DATASET_NAMES_2018:
-            root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
-
-            df_train = pd.read_csv(root_dir_dataset + '/' + dataset_name + '_TRAIN.tsv', sep='\t', header=None)
-
-            df_test = pd.read_csv(root_dir_dataset + '/' + dataset_name + '_TEST.tsv', sep='\t', header=None)
-
-            y_train = df_train.values[:, 0]
-            y_test = df_test.values[:, 0]
-
-            x_train = df_train.drop(columns=[0])
-            x_test = df_test.drop(columns=[0])
-
-            x_train.columns = range(x_train.shape[1])
-            x_test.columns = range(x_test.shape[1])
-
-            x_train = x_train.values
-            x_test = x_test.values
-
-            # znorm
-            #std_ = x_train.std(axis=1, keepdims=True)
-            #std_[std_ == 0] = 1.0
-            #x_train = (x_train - x_train.mean(axis=1, keepdims=True)) / std_
-
-            #std_ = x_test.std(axis=1, keepdims=True)
-            #std_[std_ == 0] = 1.0
-            #x_test = (x_test - x_test.mean(axis=1, keepdims=True)) / std_
-
-            datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                           y_test.copy())
-
-    else:
-        for dataset_name in UNIVARIATE_DATASET_NAMES:
-            root_dir_dataset = cur_root_dir + '/archives/' + archive_name + '/' + dataset_name + '/'
-            file_name = root_dir_dataset + dataset_name
-            x_train, y_train = readucr(file_name + '_TRAIN')
-            x_test, y_test = readucr(file_name + '_TEST')
-
-            datasets_dict[dataset_name] = (x_train.copy(), y_train.copy(), x_test.copy(),
-                                           y_test.copy())
-
-            dataset_names_to_sort.append((dataset_name, len(x_train)))
-
-        dataset_names_to_sort.sort(key=operator.itemgetter(1))
-
-        for i in range(len(UNIVARIATE_DATASET_NAMES)):
-            UNIVARIATE_DATASET_NAMES[i] = dataset_names_to_sort[i][0]
-
-    return datasets_dict
+    return {dataset_name: dataset}
 
 
 def get_func_length(x_train, x_test, func):
@@ -176,12 +90,12 @@ def get_func_length(x_train, x_test, func):
     else:
         func_length = 0
 
-    #n = x_train.shape[0]
+    # n = x_train.shape[0]
     n = len(x_train)
     for i in range(n):
         func_length = func(func_length, x_train[i].shape[1])
 
-    #n = x_test.shape[0]
+    # n = x_test.shape[0]
     n = len(x_test)
     for i in range(n):
         func_length = func(func_length, x_test[i].shape[1])
@@ -250,13 +164,13 @@ def transform_mts_to_npy_format(source_root_directory, output_root_directory):
 
         print(dataset_name, 'max', max_length, 'min', min_length)
         print()
-        #continue
+        # continue
 
-        #print(x_train[0].shape)
+        # print(x_train[0].shape)
         x_train = transform_to_same_length(x_train, n_var, max_length)
         x_test = transform_to_same_length(x_test, n_var, max_length)
-        #print(x_train.shape)
-        #continue
+        # print(x_train.shape)
+        # continue
 
         # save them
         np.save(out_dir + 'x_train.npy', x_train)
@@ -305,11 +219,11 @@ def transform_ts_to_npy_format(source_root_directory, archive_name, output_root_
         x_train = to_numpy(df_train_x)
         x_test = to_numpy(df_test_x)
 
-        #print(type(x_train.shape))
-        #print(x_test.shape)
-        #print("############")
-        #print(y_train)
-        #print(y_test)
+        # print(type(x_train.shape))
+        # print(x_test.shape)
+        # print("############")
+        # print(y_train)
+        # print(y_test)
 
         # znorm
         # std_ = x_train.std(axis=1, keepdims=True)
@@ -334,7 +248,7 @@ def transform_ts_to_npy_format(source_root_directory, archive_name, output_root_
         x_test = transform_to_same_length(x_test, n_var, max_length)
         print("Train data shape: ", x_train.shape)
         print("Test data shape: ", x_test.shape)
-        #continue
+        # continue
 
         # save them
         np.save(out_dir + 'x_train.npy', x_train)
